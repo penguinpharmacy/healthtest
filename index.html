@@ -1,0 +1,588 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>企鵝藥局 AI 顧問 | 導購整合版</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+    <style>
+        /* === 樣式保持不變 === */
+        :root { --bg: #EAF9F7; --primary: #3E6B65; --accent: #D68C45; --white: #ffffff; --text: #333333; }
+        * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+        body { font-family: "PingFang TC", sans-serif; background-color: var(--bg); color: var(--text); margin: 0; display: flex; flex-direction: column; min-height: 100vh; }
+        header { text-align: center; padding: 20px; font-weight: bold; font-size: 1.4rem; color: var(--primary); background: white; box-shadow: 0 2px 10px rgba(0,0,0,0.05); position: sticky; top: 0; z-index: 100; }
+        .container { width: 100%; max-width: 800px; margin: 0 auto; padding: 20px; flex: 1; display: flex; flex-direction: column; }
+        .progress-fixed { position: fixed; top: 0; left: 0; width: 100%; height: 5px; z-index: 99; }
+        .progress-fill { height: 100%; background: var(--accent); width: 0%; transition: width 0.3s; }
+        .card { background: var(--white); border-radius: 20px; padding: 40px 30px; box-shadow: 0 5px 20px rgba(0,0,0,0.05); text-align: center; animation: fadeIn 0.4s ease-out; }
+        h2 { font-size: 1.6rem; color: var(--primary); margin-bottom: 30px; font-weight: normal; }
+        
+        #page-profile { display: block; }
+        .radio-group { display: flex; justify-content: center; gap: 30px; margin-bottom: 30px; }
+        .date-row { display: flex; gap: 10px; justify-content: center; margin-bottom: 10px; }
+        select.custom-select { padding: 12px; border: 1px solid #ddd; border-radius: 10px; font-size: 1rem; flex: 1; text-align: center; }
+        .age-display { height: 30px; color: var(--accent); font-weight: bold; font-size: 1.1rem; margin-bottom: 30px; }
+        .input-row { display: flex; gap: 15px; justify-content: center; margin-bottom: 40px; }
+        .input-wrap { position: relative; width: 120px; }
+        .input-wrap input { width: 100%; padding: 12px; border: 1px solid #ddd; border-radius: 10px; font-size: 1.1rem; text-align: center; }
+        .input-wrap span { position: absolute; right: 10px; top: 12px; color: #999; }
+
+        #page-quiz { display: none; }
+        .category-tag { font-size: 0.9rem; color: #666; border-bottom: 2px solid var(--primary); display: inline-block; padding-bottom: 5px; margin-bottom: 20px; }
+        .options-grid { display: flex; flex-wrap: wrap; gap: 15px; justify-content: center; }
+        .btn-opt { background: white; border: 1px solid #8FAFAF; border-radius: 50px; padding: 15px 30px; font-size: 1.1rem; color: #555; cursor: pointer; min-width: 140px; transition: 0.2s; }
+        .btn-opt.selected { background-color: var(--primary); color: white; border-color: var(--primary); font-weight: bold; box-shadow: 0 4px 10px rgba(62, 107, 101, 0.3); }
+        .btn-circle { width: 120px; height: 120px; border-radius: 50%; background: white; border: 1px solid #8FAFAF; display: flex; align-items: center; justify-content: center; font-size: 1.1rem; color: #555; cursor: pointer; transition: 0.2s; }
+        .btn-circle.selected { border: 3px solid var(--primary); color: var(--primary); font-weight: bold; }
+        .footer-nav { margin-top: 40px; display: flex; justify-content: center; gap: 20px; }
+        .btn-main { background: var(--primary); color: white; border: none; padding: 14px 60px; border-radius: 50px; font-size: 1.2rem; font-weight: bold; cursor: pointer; min-width: 160px; transition: 0.3s; }
+        .btn-prev { background: transparent; color: #888; border: 1px solid #ccc; padding: 14px 30px; border-radius: 50px; font-size: 1rem; cursor: pointer; }
+
+        #page-result { display: none; }
+        .dashboard { background: white; border-radius: 20px; padding: 30px; margin-bottom: 20px; box-shadow: 0 5px 15px rgba(0,0,0,0.05); }
+        .user-head { display: flex; justify-content: space-between; align-items: center; border-bottom: 1px dashed #eee; padding-bottom: 20px; margin-bottom: 20px; }
+        .bmi-bar { height: 10px; background: linear-gradient(90deg, #81C784, #FFD54F, #E57373); border-radius: 5px; position: relative; margin: 20px 0; }
+        .bmi-pointer { position: absolute; top: -5px; width: 4px; height: 20px; background: #333; }
+        .prod-list { margin-top: 30px; }
+        .prod-head { background: #455A64; color: white; padding: 12px 20px; border-radius: 8px 8px 0 0; font-weight: bold; margin-top: 25px; text-align: left; }
+        .prod-head.bonus { background: #FBC02D; color: #5D4037; }
+        
+        /* 產品卡片懸停效果 */
+        .prod-item { background: white; border-bottom: 1px solid #eee; padding: 20px; display: flex; align-items: center; text-align: left; transition: all 0.2s; }
+        .prod-item:hover { background-color: #F8FDFD; transform: translateX(5px); }
+        
+        .p-img { width: 80px; height: 80px; background-color: #eee; border-radius: 10px; margin-right: 20px; flex-shrink: 0; background-size: cover; background-position: center; }
+        .tag { font-size: 0.8rem; background: #E0F2F1; color: #00695C; padding: 2px 8px; border-radius: 4px; margin-top: 5px; display: inline-block; }
+        .p-price { margin-left: auto; font-weight: bold; color: var(--accent); min-width: 80px; text-align: right; }
+
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+    </style>
+</head>
+<body>
+
+<div class="progress-fixed"><div class="progress-fill" id="progressBar"></div></div>
+<header>🐧 企鵝藥局 AI 顧問</header>
+
+<div class="container">
+    <div id="page-profile" class="card">
+        <h2>首先，讓我們了解您的基本數值</h2>
+        <div class="radio-group">
+            <label style="cursor:pointer"><input type="radio" name="gender" value="男" checked> 先生</label>
+            <label style="cursor:pointer"><input type="radio" name="gender" value="女"> 小姐</label>
+        </div>
+        <div class="date-row" id="date-selectors"></div>
+        <div class="age-display" id="age-text"></div>
+        <div class="input-row">
+            <div class="input-wrap"><input type="number" id="inp-h" placeholder="170"><span>cm</span></div>
+            <div class="input-wrap"><input type="number" id="inp-w" placeholder="65"><span>kg</span></div>
+        </div>
+        <button class="btn-main" onclick="validateAndStart()">下一步</button>
+    </div>
+
+    <div id="page-quiz">
+        <div id="quiz-content" class="card"></div>
+    </div>
+
+    <div id="page-result"></div>
+</div>
+
+<script>
+    // ============================================
+    // 🛍️ 藥局商品資料庫 (請在此替換您的商品與連結)
+    // ============================================
+    const productsDB = [
+        // id: 唯一代碼
+        // tags: 對應問題的標籤 (AI 推薦依據)
+        // url: 您的商品連結
+        // img: 您的商品圖片網址
+        
+        { id:'b1', name:'企鵝活力B群+鋅', price:650, tags:['#basic_male', '#tired'], url:'https://www.momoshop.com.tw', img:'', desc:'緩釋技術，整天好精神' },
+        { id:'b2', name:'高單位維生素C', price:450, tags:['#basic_female', '#skin_dull'], url:'', img:'', desc:'抗氧化，促進膠原蛋白' },
+        { id:'b3', name:'維生素 D3 滴劑', price:480, tags:['#no_sun', '#bone_weak'], url:'', img:'', desc:'液態好吸收，陽光營養' },
+        { id:'b4', name:'85% rTG 魚油', price:1200, tags:['#eat_out', '#eye_dry', '#brain_fog'], url:'', img:'', desc:'高濃度 Omega-3' },
+        
+        { id:'s1', name:'GABA 晚安膠囊', price:980, tags:['#sleep_hard', '#stress'], url:'', img:'', desc:'縮短入睡時間' },
+        { id:'s2', name:'專利芝麻素 EX', price:850, tags:['#sleep_dream', '#liver'], url:'', img:'', desc:'護肝助眠，提升品質' },
+        
+        { id:'d1', name:'300億 機能益生菌', price:1080, tags:['#constipation', '#immune_bad'], url:'', img:'', desc:'排便順暢，調整體質' },
+        { id:'d2', name:'綜合蔬果酵素', price:750, tags:['#bloating', '#eat_fast'], url:'', img:'', desc:'分解食物，減少脹氣' },
+        
+        { id:'e1', name:'游離型葉黃素', price:1200, tags:['#blue_light', '#eye_use_heavy'], url:'', img:'', desc:'吸收率佳，阻擋藍光' },
+        
+        { id:'sk1', name:'膠原蛋白胜肽', price:1350, tags:['#skin_saggy', '#wrinkle'], url:'', img:'', desc:'小分子，彈力支撐' },
+        
+        { id:'bn1', name:'UC-II 膠原蛋白', price:1680, tags:['#joint_pain', '#sport_heavy'], url:'', img:'', desc:'關鍵靈活' },
+        
+        { id:'mn1', name:'黑瑪卡 + 精胺酸', price:1100, tags:['#man_power', '#tired_morning'], url:'', img:'', desc:'男性戰鬥力' },
+        
+        { id:'wm1', name:'蔓越莓益生菌', price:650, tags:['#private_part'], url:'', img:'', desc:'私密呵護' }
+    ];
+
+    // ============================================
+    // 📚 140 題完整題庫
+    // ============================================
+    const expertDB = {
+        'sleep': [
+            { q:'躺在床上後，大概翻多久才會真的睡著呢？', type:'circle', options:[{t:'15分內'},{t:'30分內'},{t:'30分以上',tag:'#sleep_hard'}] },
+            { q:'半夜會不會常常醒來？', type:'circle', options:[{t:'一覺到天亮'},{t:'偶爾'},{t:'常常',tag:'#sleep_wake'}] },
+            { q:'睡覺時是否多夢，起床覺得好累？', type:'pill', options:[{t:'很少'},{t:'偶爾'},{t:'經常多夢',tag:'#sleep_dream'}] },
+            { q:'早上鬧鐘還沒響就醒了，而且睡不著？', type:'pill', options:[{t:'不會'},{t:'偶爾'},{t:'經常',tag:'#sleep_wake'}] },
+            { q:'睡前一小時，您通常在做什麼？(複選)', type:'pill', multi:true, options:[{t:'滑手機',tag:'#blue_light'},{t:'吃宵夜',tag:'#bloating'},{t:'喝酒',tag:'#liver'},{t:'放鬆'}] },
+            { q:'覺得最近壓力大到「腦袋停不下來」嗎？', type:'pill', options:[{t:'還好'},{t:'偶爾'},{t:'停不下來',tag:'#stress'}] },
+            { q:'平常有喝咖啡或茶的習慣嗎？', type:'pill', options:[{t:'不喝'},{t:'1杯'},{t:'2杯以上'}] },
+            { q:'枕邊人有說過您睡覺會打呼嗎？', type:'pill', options:[{t:'沒有'},{t:'輕微'},{t:'很大聲'}] },
+            { q:'目前有在吃安眠藥幫助入睡嗎？', type:'pill', options:[{t:'沒有'},{t:'偶爾吃'},{t:'長期依賴'}] },
+            { q:'您覺得睡不好的主要原因是？', type:'pill', options:[{t:'壓力'},{t:'環境'},{t:'身體痛'}] }
+        ],
+        'digest': [
+            { q:'最近便便的頻率大概是如何呢？', type:'circle', options:[{t:'每天順暢'},{t:'2-3天一次',tag:'#constipation'},{t:'3天以上',tag:'#constipation'}] },
+            { q:'吃飽飯後，肚子會容易脹氣不舒服嗎？', type:'circle', options:[{t:'很少'},{t:'偶爾',tag:'#bloating'},{t:'經常',tag:'#bloating'}] },
+            { q:'會有「火燒心」或胃痛的感覺嗎？', type:'pill', options:[{t:'沒有'},{t:'偶爾',tag:'#stomach_pain'},{t:'經常',tag:'#stomach_pain'}] },
+            { q:'平常青菜水果吃得夠嗎？', type:'pill', options:[{t:'每餐都有'},{t:'一天一次'},{t:'很少吃',tag:'#constipation'}] },
+            { q:'喜歡吃炸物或是麻辣鍋嗎？', type:'pill', options:[{t:'很少'},{t:'一週1-2次'},{t:'無辣不歡',tag:'#stomach_pain'}] },
+            { q:'喝牛奶肚子會不會咕嚕咕嚕或是拉肚子？', type:'pill', options:[{t:'不會'},{t:'會脹氣'},{t:'會拉肚子'}] },
+            { q:'一緊張就會想跑廁所嗎？', type:'pill', options:[{t:'不會'},{t:'偶爾'},{t:'會(腸躁)'}] },
+            { q:'平常水有喝夠嗎？(體重 x 30cc)', type:'pill', options:[{t:'有喝夠'},{t:'不太夠',tag:'#constipation'}] },
+            { q:'三餐是在外面吃比較多嗎？', type:'pill', options:[{t:'自煮'},{t:'一半一半'},{t:'三餐老外',tag:'#eat_out'}] },
+            { q:'便便形狀看起來像？', type:'pill', options:[{t:'香蕉狀'},{t:'羊便便',tag:'#constipation'},{t:'糊狀'}] }
+        ],
+        'eye': [
+            { q:'每天盯著螢幕(手機/電腦)的時間？', type:'circle', options:[{t:'4小時內'},{t:'4-8小時',tag:'#blue_light'},{t:'超過8小時',tag:'#eye_use_heavy'}] },
+            { q:'到了下午，眼睛會覺得乾乾澀澀的嗎？', type:'circle', options:[{t:'不會'},{t:'稍微乾',tag:'#eye_dry'},{t:'非常乾澀',tag:'#eye_dry'}] },
+            { q:'看東西會不會覺得糊糊的，眨眼才好轉？', type:'pill', options:[{t:'否'},{t:'偶爾',tag:'#focus_bad'},{t:'經常',tag:'#focus_bad'}] },
+            { q:'晚上開車或在暗處，會覺得視力變差嗎？', type:'pill', options:[{t:'否'},{t:'稍微'},{t:'明顯看不清'}] },
+            { q:'是否有飛蚊症(眼前有黑點飄動)？', type:'pill', options:[{t:'無'},{t:'偶爾'},{t:'長期存在'}] },
+            { q:'配戴隱形眼鏡的習慣？', type:'pill', options:[{t:'不戴'},{t:'日拋'},{t:'每天>8小時',tag:'#eye_dry'}] },
+            { q:'是否常吃深綠色蔬菜(葉黃素)？', type:'pill', options:[{t:'常吃'},{t:'普通'},{t:'不愛吃'}] },
+            { q:'是否常感到眼窩痠痛？', type:'pill', options:[{t:'無'},{t:'偶爾'},{t:'經常',tag:'#eye_use_heavy'}] },
+            { q:'戶外活動頻率？', type:'pill', options:[{t:'都在室內'},{t:'週末'},{t:'每天'}] },
+            { q:'家族有青光眼/黃斑部病變史嗎？', type:'pill', options:[{t:'無'},{t:'有'}] }
+        ],
+        'energy': [
+            { q:'一天當中，什麼時候覺得最累？', type:'pill', options:[{t:'起床時',tag:'#tired_morning'},{t:'飯後'},{t:'整天都累',tag:'#tired'}] },
+            { q:'睡飽之後，體力有恢復的感覺嗎？', type:'pill', options:[{t:'有充飽電'},{t:'稍微'},{t:'睡再久還是累',tag:'#tired'}] },
+            { q:'如果不喝咖啡，會無法工作嗎？', type:'pill', options:[{t:'不會'},{t:'會沒精神'},{t:'完全無法運作'}] },
+            { q:'目前有規律的運動習慣嗎？', type:'pill', options:[{t:'每週3次+'},{t:'每週1-2次'},{t:'幾乎沒有'}] },
+            { q:'是否覺得很難集中精神(腦霧感)？', type:'pill', options:[{t:'否'},{t:'偶爾'},{t:'是,腦袋鈍鈍',tag:'#brain_fog'}] },
+            { q:'是否有熬夜習慣？', type:'pill', options:[{t:'無'},{t:'偶爾'},{t:'經常',tag:'#liver'}] },
+            { q:'蹲下站起是否容易頭暈？', type:'pill', options:[{t:'否'},{t:'偶爾'},{t:'經常'}] },
+            { q:'是否常吃精緻澱粉(麵包/麵食)？', type:'pill', options:[{t:'少吃'},{t:'普通'},{t:'每餐都是'}] },
+            { q:'是否特別怕冷？', type:'pill', options:[{t:'否'},{t:'冬天會'},{t:'一年四季'}] },
+            { q:'覺得疲累主因是？', type:'pill', options:[{t:'工作'},{t:'睡眠'},{t:'壓力'}] }
+        ],
+        'mood': [
+            { q:'最近壓力指數(1-10)？', type:'circle', options:[{t:'低(1-3)'},{t:'中(4-7)'},{t:'高(8-10)',tag:'#stress'}] },
+            { q:'是否容易感到焦慮或緊張？', type:'pill', options:[{t:'否'},{t:'偶爾'},{t:'經常',tag:'#stress'}] },
+            { q:'是否因煩惱而影響睡眠？', type:'pill', options:[{t:'否'},{t:'偶爾'},{t:'經常失眠',tag:'#sleep_hard'}] },
+            { q:'工作時是否難以專注？', type:'pill', options:[{t:'否'},{t:'稍微'},{t:'嚴重影響'}] },
+            { q:'容易對周遭的人感到不耐煩？', type:'pill', options:[{t:'否'},{t:'偶爾'},{t:'經常易怒'}] },
+            { q:'下班後能真正放鬆嗎？', type:'pill', options:[{t:'可以'},{t:'很難'},{t:'完全無法'}] },
+            { q:'是否有補充鈣/鎂食物？', type:'pill', options:[{t:'有'},{t:'偶爾'},{t:'很少'}] },
+            { q:'緊張時身體會有反應(胃痛)嗎？', type:'pill', options:[{t:'無'},{t:'偶爾'},{t:'經常'}] },
+            { q:'是否不想與人接觸？', type:'pill', options:[{t:'否'},{t:'看心情'},{t:'想封閉自己'}] },
+            { q:'壓力大時會暴飲暴食嗎？', type:'pill', options:[{t:'不會'},{t:'會'}] }
+        ],
+        'skin': [
+            { q:'您覺得自己的膚質偏向？', type:'pill', options:[{t:'中性'},{t:'乾性',tag:'#skin_dry'},{t:'油性'},{t:'混合性'}] },
+            { q:'最想改善的問題？(複選)', type:'pill', multi:true, options:[{t:'痘痘',tag:'#liver'},{t:'暗沈',tag:'#skin_dull'},{t:'細紋',tag:'#wrinkle'},{t:'敏感'}] },
+            { q:'洗完臉後，皮膚會覺得緊繃嗎？', type:'pill', options:[{t:'否'},{t:'稍微'},{t:'非常緊繃',tag:'#skin_dry'}] },
+            { q:'是否覺得臉頰彈性變差？', type:'pill', options:[{t:'否'},{t:'有一點'},{t:'明顯變差',tag:'#skin_saggy'}] },
+            { q:'喜歡吃甜食或手搖飲嗎？', type:'pill', options:[{t:'不愛'},{t:'偶爾'},{t:'每天都要'}] },
+            { q:'出門有擦防曬的習慣嗎？', type:'pill', options:[{t:'每天'},{t:'看太陽'},{t:'很少擦'}] },
+            { q:'熬夜後皮膚會變差嗎？', type:'pill', options:[{t:'還好'},{t:'會暗沈'},{t:'會爆痘'}] },
+            { q:'便秘時皮膚會變差嗎？', type:'pill', options:[{t:'無關'},{t:'有感覺'}] },
+            { q:'換季是否容易過敏？', type:'pill', options:[{t:'否'},{t:'偶爾'},{t:'經常'}] },
+            { q:'是否有補充膠原蛋白？', type:'pill', options:[{t:'有'},{t:'無'}] }
+        ],
+        'hair': [
+            { q:'洗頭時掉髮量明顯嗎？', type:'circle', options:[{t:'正常'},{t:'比以前多'},{t:'明顯變多'}] },
+            { q:'是否感覺髮際線後退？', type:'pill', options:[{t:'無'},{t:'稍微'},{t:'明顯'}] },
+            { q:'頭皮容易出油嗎？', type:'pill', options:[{t:'乾性'},{t:'中性'},{t:'油性'}] },
+            { q:'是否有頭皮屑困擾？', type:'pill', options:[{t:'無'},{t:'偶爾'},{t:'經常'}] },
+            { q:'目前髮質狀況？', type:'pill', options:[{t:'健康'},{t:'乾燥易斷'},{t:'細軟扁塌'}] },
+            { q:'是否有白髮困擾？', type:'pill', options:[{t:'無'},{t:'有些許'},{t:'明顯增加'}] },
+            { q:'蛋白質攝取足夠嗎？', type:'pill', options:[{t:'足夠'},{t:'普通'},{t:'不足'}] },
+            { q:'近期有生病或壓力大嗎？', type:'pill', options:[{t:'無'},{t:'有'}] },
+            { q:'家族有雄性禿遺傳嗎？', type:'pill', options:[{t:'無'},{t:'有'}] },
+            { q:'是否有染燙習慣？', type:'pill', options:[{t:'無'},{t:'偶爾'},{t:'經常'}] }
+        ],
+        'man': [
+            { q:'整體精神活力如何？', type:'circle', options:[{t:'充沛'},{t:'普通'},{t:'力不從心',tag:'#man_power'}] },
+            { q:'半夜需要起床上廁所嗎？', type:'pill', options:[{t:'0次'},{t:'1次'},{t:'2次以上'}] },
+            { q:'排尿是否有變細或解不乾淨？', type:'pill', options:[{t:'無'},{t:'偶爾'},{t:'經常'}] },
+            { q:'近期對親密關係的興趣？', type:'pill', options:[{t:'正常'},{t:'稍微降低'},{t:'明顯降低',tag:'#man_power'}] },
+            { q:'運動時體力下降很快？', type:'pill', options:[{t:'否'},{t:'稍微'},{t:'明顯流失'}] },
+            { q:'主要壓力來源？', type:'pill', options:[{t:'工作'},{t:'家庭'},{t:'經濟'}] },
+            { q:'是否有煙酒習慣？', type:'pill', options:[{t:'無'},{t:'偶爾'},{t:'習慣性'}] },
+            { q:'是否有腹部肥胖？', type:'pill', options:[{t:'無'},{t:'有一點'},{t:'明顯'}] },
+            { q:'近期有備孕計畫嗎？', type:'pill', options:[{t:'無'},{t:'考慮中'},{t:'備孕中'}] },
+            { q:'是否有落髮困擾？', type:'pill', options:[{t:'無'},{t:'輕微'},{t:'明顯'}] }
+        ],
+        'woman': [
+            { q:'月經週期是否規律？', type:'circle', options:[{t:'規律'},{t:'偶爾不準'},{t:'經常亂經'}] },
+            { q:'生理期會不會經痛？', type:'pill', options:[{t:'無感'},{t:'輕微'},{t:'痛需吃藥'}] },
+            { q:'經前是否有不適(PMS)？', type:'pill', multi:true, options:[{t:'無'},{t:'胸漲'},{t:'情緒暴躁'},{t:'水腫'}] },
+            { q:'是否有私密處困擾？', type:'pill', options:[{t:'無'},{t:'偶爾'},{t:'經常',tag:'#private_part'}] },
+            { q:'是否曾反覆感染(尿道/陰道)？', type:'pill', options:[{t:'從未'},{t:'偶爾'},{t:'經常反覆',tag:'#private_part'}] },
+            { q:'是否有更年期症狀？', type:'pill', options:[{t:'無'},{t:'輕微'},{t:'明顯'}] },
+            { q:'生理期容易頭暈(缺鐵)嗎？', type:'pill', options:[{t:'否'},{t:'稍微'},{t:'是'}] },
+            { q:'是否有憋尿習慣？', type:'pill', options:[{t:'否'},{t:'忙碌時會'},{t:'經常'}] },
+            { q:'目前備孕狀態？', type:'pill', options:[{t:'無計畫'},{t:'備孕中'},{t:'懷孕/哺乳'}] },
+            { q:'是否有補充益生菌？', type:'pill', options:[{t:'有'},{t:'無'}] }
+        ],
+        'bone': [
+            { q:'上下樓梯膝蓋會痛嗎？', type:'circle', options:[{t:'否'},{t:'偶爾痠軟'},{t:'經常疼痛',tag:'#joint_pain'}] },
+            { q:'活動關節有卡卡聲嗎？', type:'pill', options:[{t:'無'},{t:'有聲不痛'},{t:'有聲且痛',tag:'#joint_pain'}] },
+            { q:'起床是否覺得關節僵硬？', type:'pill', options:[{t:'否'},{t:'稍微'},{t:'是'}] },
+            { q:'舊傷天氣變就酸痛？', type:'pill', options:[{t:'無舊傷'},{t:'偶爾'},{t:'經常'}] },
+            { q:'平常有攝取鈣質(奶/魚)嗎？', type:'pill', options:[{t:'每天'},{t:'偶爾'},{t:'很少',tag:'#bone_weak'}] },
+            { q:'常曬太陽(維生素D)嗎？', type:'pill', options:[{t:'正常'},{t:'偶爾'},{t:'完全防曬',tag:'#no_sun'}] },
+            { q:'有做重訓/肌力訓練嗎？', type:'pill', options:[{t:'有'},{t:'無'}] },
+            { q:'家族有骨鬆病史嗎？', type:'pill', options:[{t:'無'},{t:'有'}] },
+            { q:'每日咖啡因攝取？', type:'pill', options:[{t:'不喝'},{t:'1杯'},{t:'2杯以上'}] },
+            { q:'是否常腰酸背痛？', type:'pill', options:[{t:'否'},{t:'偶爾'},{t:'經常'}] }
+        ],
+        'circ': [
+            { q:'冬天手腳容易冰冷嗎？', type:'circle', options:[{t:'否'},{t:'稍微'},{t:'像冰塊一樣',tag:'#circ_bad'}] },
+            { q:'久坐時手腳容易發麻嗎？', type:'pill', options:[{t:'否'},{t:'偶爾'},{t:'經常',tag:'#circ_bad'}] },
+            { q:'蹲下站起會頭暈嗎？', type:'pill', options:[{t:'否'},{t:'偶爾'},{t:'經常'}] },
+            { q:'腿部有青筋浮起或腫脹嗎？', type:'pill', options:[{t:'無'},{t:'輕微'},{t:'明顯'}] },
+            { q:'常覺得肩膀脖子僵硬？', type:'pill', options:[{t:'否'},{t:'偶爾'},{t:'經常'}] },
+            { q:'血壓是否偏高？', type:'pill', options:[{t:'正常'},{t:'偏高',tag:'#high_bp'},{t:'有高血壓',tag:'#high_bp'}] },
+            { q:'飲食偏重口味(鹹)嗎？', type:'pill', options:[{t:'清淡'},{t:'普通'},{t:'重口味'}] },
+            { q:'是否有補充魚油？', type:'pill', options:[{t:'有'},{t:'無'}] },
+            { q:'是否偶爾感到心悸？', type:'pill', options:[{t:'無'},{t:'偶爾'},{t:'經常'}] },
+            { q:'有規律有氧運動嗎？', type:'pill', options:[{t:'有'},{t:'無'}] }
+        ],
+        'immune': [
+            { q:'平均一年感冒幾次？', type:'circle', options:[{t:'0-1次'},{t:'2-3次'},{t:'3次以上',tag:'#immune_bad'}] },
+            { q:'生病後復原速度？', type:'pill', options:[{t:'很快'},{t:'普通'},{t:'很久'}] },
+            { q:'有過敏體質(鼻/皮膚)嗎？', type:'pill', options:[{t:'無'},{t:'換季有'},{t:'長期困擾'}] },
+            { q:'容易嘴破或口角炎嗎？', type:'pill', options:[{t:'從不'},{t:'偶爾'},{t:'熬夜就破'}] },
+            { q:'勞累時會長皰疹嗎？', type:'pill', options:[{t:'否'},{t:'偶爾'},{t:'經常復發'}] },
+            { q:'是否有便秘問題？', type:'pill', options:[{t:'無'},{t:'有'}] },
+            { q:'是否嚴重偏食？', type:'pill', options:[{t:'均衡'},{t:'偏食'}] },
+            { q:'睡眠不足容易生病嗎？', type:'pill', options:[{t:'否'},{t:'明顯'}] },
+            { q:'有規律運動嗎？', type:'pill', options:[{t:'有'},{t:'無'}] },
+            { q:'常處於密閉空間嗎？', type:'pill', options:[{t:'否'},{t:'是'}] }
+        ],
+        'sport': [
+            { q:'平均每週運動幾次？', type:'circle', options:[{t:'1-2次'},{t:'3-4次'},{t:'5次以上'}] },
+            { q:'運動強度通常是？', type:'pill', options:[{t:'輕度'},{t:'中度'},{t:'高強度',tag:'#sport_heavy'}] },
+            { q:'運動主要目標？', type:'pill', options:[{t:'健康'},{t:'增肌'},{t:'減脂'}] },
+            { q:'運動後痠痛持續多久？', type:'pill', options:[{t:'隔天好'},{t:'2-3天'},{t:'超過3天'}] },
+            { q:'運動中容易抽筋嗎？', type:'pill', options:[{t:'否'},{t:'偶爾'},{t:'經常',tag:'#cramp'}] },
+            { q:'後段是否覺得沒力？', type:'pill', options:[{t:'否'},{t:'稍微'},{t:'明顯沒力'}] },
+            { q:'有補充蛋白質嗎？', type:'pill', options:[{t:'有'},{t:'無'}] },
+            { q:'關節是否不適？', type:'pill', options:[{t:'無'},{t:'膝蓋/腰'}] },
+            { q:'運動當天較好睡嗎？', type:'pill', options:[{t:'是'},{t:'亢奮'}] },
+            { q:'流汗程度？', type:'pill', options:[{t:'少汗'},{t:'爆汗'}] }
+        ],
+        'work': [
+            { q:'能持續專注的時間？', type:'circle', options:[{t:'2小時+'},{t:'1小時'},{t:'30分內',tag:'#brain_fog'}] },
+            { q:'常忘東忘西(金魚腦)？', type:'pill', options:[{t:'否'},{t:'偶爾'},{t:'經常'}] },
+            { q:'反應變慢、腦袋鈍鈍？', type:'pill', options:[{t:'否'},{t:'疲勞時'},{t:'長期如此'}] },
+            { q:'飯後是否特別想睡？', type:'pill', options:[{t:'否'},{t:'稍微'},{t:'無法克制'}] },
+            { q:'多工處理會焦慮嗎？', type:'pill', options:[{t:'應付自如'},{t:'有點壓力'},{t:'混亂'}] },
+            { q:'下班後覺得頭脹痛？', type:'pill', options:[{t:'否'},{t:'偶爾'},{t:'經常'}] },
+            { q:'睡不飽影響表現嗎？', type:'pill', options:[{t:'還好'},{t:'有影響'},{t:'無法工作'}] },
+            { q:'是否有補充魚油(DHA)？', type:'pill', options:[{t:'有'},{t:'無'}] },
+            { q:'常覺得話在嘴邊說不出？', type:'pill', options:[{t:'否'},{t:'偶爾'},{t:'經常'}] },
+            { q:'壓力導致情緒失控？', type:'pill', options:[{t:'否'},{t:'偶爾'},{t:'經常'}] }
+        ]
+    };
+
+    // 初始目標選擇題
+    const goalQuestion = {
+        id: 'goals',
+        q: '請問您目前最想改善或是保養的地方？',
+        subtitle: 'AI 藥師將為您展開深度諮詢 (可複選)',
+        type: 'pill',
+        multi: true,
+        options: [
+            {t:'消化道機能', key:'digest'}, {t:'晶亮不怕3C', key:'eye'}, {t:'入睡狀況', key:'sleep'}, 
+            {t:'精神體力', key:'energy'}, {t:'心情壓力', key:'mood'}, {t:'養顏美容', key:'skin'},
+            {t:'私密保養', key:'woman'}, {t:'男人課題', key:'man'}, {t:'保護力', key:'immune'},
+            {t:'骨骼及行動力', key:'bone'}, {t:'循環系統問題', key:'circ'}, {t:'運動後保養', key:'sport'},
+            {t:'不怕洗頭梳頭', key:'hair'}, {t:'上班課不當機', key:'work'}
+        ],
+        mapping: {
+            '入睡狀況':'sleep', '消化道機能':'digest', '晶亮不怕3C':'eye', '不怕洗頭梳頭':'hair',
+            '心情壓力':'mood', '精神體力':'energy', '上班課不當機':'work', '循環系統問題':'circ',
+            '私密保養':'woman', '男人課題':'man', '保護力':'immune', '養顏美容':'skin',
+            '骨骼及行動力':'bone', '運動後保養':'sport'
+        }
+    };
+
+    // ============================================
+    // 2. 系統邏輯
+    // ============================================
+    let state = {
+        queue: [goalQuestion],
+        idx: 0,
+        history: [], // 時光機歷史
+        answers: {},
+        userTags: new Set(),
+        userInfo: { ageY: 0, ageM: 0, bmi: 0, gender: '' }
+    };
+
+    window.onload = function() {
+        const dateDiv = document.getElementById('date-selectors');
+        const year = new Date().getFullYear();
+        let html = `
+            <select id="sel-y" class="custom-select"><option value="">年</option>${Array.from({length:80}, (_,i)=>`<option>${year-i}</option>`).join('')}</select>
+            <select id="sel-m" class="custom-select"><option value="">月</option>${Array.from({length:12}, (_,i)=>`<option>${i+1}</option>`).join('')}</select>
+            <select id="sel-d" class="custom-select"><option value="">日</option>${Array.from({length:31}, (_,i)=>`<option>${i+1}</option>`).join('')}</select>
+        `;
+        dateDiv.innerHTML = html;
+
+        dateDiv.querySelectorAll('select').forEach(s => s.addEventListener('change', () => {
+            const y = document.getElementById('sel-y').value;
+            const m = document.getElementById('sel-m').value;
+            const d = document.getElementById('sel-d').value;
+            if(y && m && d) {
+                const today = new Date();
+                let ageY = today.getFullYear() - y;
+                let ageM = today.getMonth() + 1 - m;
+                if(ageM < 0) { ageY--; ageM += 12; }
+                document.getElementById('age-text').innerText = `您目前 ${ageY} 歲 ${ageM} 個月`;
+                state.userInfo.ageY = ageY;
+                state.userInfo.ageM = ageM;
+            }
+        }));
+    };
+
+    function validateAndStart() {
+        const h = document.getElementById('inp-h').value;
+        const w = document.getElementById('inp-w').value;
+        const y = document.getElementById('sel-y').value;
+        
+        if(!h || !w || !y) { alert("請完整填寫資料"); return; }
+
+        state.userInfo.gender = document.querySelector('input[name="gender"]:checked').parentElement.innerText.trim();
+        state.userInfo.bmi = (w / ((h/100)*(h/100))).toFixed(1);
+
+        if(state.userInfo.gender.includes('先生')) state.userTags.add('#basic_male');
+        if(state.userInfo.gender.includes('小姐')) state.userTags.add('#basic_female');
+
+        document.getElementById('page-profile').style.display = 'none';
+        document.getElementById('page-quiz').style.display = 'block';
+        renderQuiz();
+    }
+
+    function renderQuiz() {
+        const q = state.queue[state.idx];
+        const pct = ((state.idx + 1) / (state.queue.length + 1)) * 100;
+        document.getElementById('progressBar').style.width = `${pct}%`;
+
+        let html = `
+            <div class="card">
+                <span class="category-tag">${q.cat || '深度檢測'}</span>
+                <h2>${q.q}</h2>
+                <div class="options-grid">
+        `;
+
+        q.options.forEach(opt => {
+            const text = opt.t || opt;
+            const isSel = checkSelected(q.id || `q${state.idx}`, text);
+            const btnClass = q.type === 'circle' ? 'btn-circle' : 'btn-opt';
+            html += `<div class="${btnClass} ${isSel?'selected':''}" onclick="handleOption('${text}', ${q.multi})">${text}</div>`;
+        });
+
+        html += `</div>
+            <div class="footer-nav">
+                ${state.idx > 0 ? `<button class="btn-prev" onclick="goPrev()">上一題</button>` : ''}
+                <button class="btn-main" onclick="goNext()">下一步</button>
+            </div>
+        </div>`;
+        document.getElementById('quiz-content').innerHTML = html;
+        window.scrollTo(0,0);
+    }
+
+    function checkSelected(qid, val) {
+        const stored = state.answers[qid];
+        if(Array.isArray(stored)) return stored.includes(val);
+        return stored === val;
+    }
+
+    window.handleOption = function(val, isMulti) {
+        const q = state.queue[state.idx];
+        const qid = q.id || `q${state.idx}`;
+        const optObj = q.options.find(o => (o.t || o) === val);
+        const tag = optObj ? optObj.tag : null;
+
+        if(isMulti) {
+            if(!state.answers[qid]) state.answers[qid] = [];
+            const idx = state.answers[qid].indexOf(val);
+            if(idx > -1) {
+                state.answers[qid].splice(idx, 1);
+                if(tag) state.userTags.delete(tag);
+            } else {
+                state.answers[qid].push(val);
+                if(tag) state.userTags.add(tag);
+            }
+        } else {
+            state.answers[qid] = val;
+            if(tag) state.userTags.add(tag);
+        }
+        renderQuiz();
+    }
+
+    window.goNext = function() {
+        const q = state.queue[state.idx];
+        const qid = q.id || `q${state.idx}`;
+
+        if(!state.answers[qid] || state.answers[qid].length === 0) {
+            alert("請選擇一個選項喔！"); return;
+        }
+
+        // 保存歷史
+        state.history.push(JSON.parse(JSON.stringify({
+            idx: state.idx,
+            queue: state.queue,
+            answers: state.answers,
+            tags: Array.from(state.userTags)
+        })));
+
+        if(qid === 'goals') {
+            const selectedGoals = state.answers['goals'];
+            let newQueue = [state.queue[0]]; 
+            
+            selectedGoals.forEach(g => {
+                const mapObj = q.options.find(o => o.t === g); 
+                const dbKey = mapObj ? mapObj.key : null;
+                if(dbKey && expertDB[dbKey]) {
+                    newQueue = newQueue.concat(expertDB[dbKey].map(x => ({...x, cat: g})));
+                }
+            });
+            state.queue = newQueue;
+        }
+
+        if (state.idx < state.queue.length - 1) {
+            state.idx++;
+            renderQuiz();
+        } else {
+            showResult();
+        }
+    }
+
+    window.goPrev = function() {
+        if (state.history.length > 0) {
+            const last = state.history.pop();
+            state.idx = last.idx;
+            state.queue = last.queue;
+            state.answers = last.answers;
+            state.userTags = new Set(last.tags);
+            renderQuiz();
+        }
+    }
+
+    // ============================================
+    // 3. 結果與推薦
+    // ============================================
+    function showResult() {
+        document.getElementById('page-quiz').style.display = 'none';
+        const resDiv = document.getElementById('page-result');
+        resDiv.style.display = 'block';
+        document.getElementById('progressBar').style.width = '100%';
+
+        const bmiPos = Math.min(Math.max((state.userInfo.bmi - 15) * 4, 0), 100);
+        const { basics, addons, total } = analyzeAndRecommend();
+
+        resDiv.innerHTML = `
+            <div class="dashboard">
+                <div class="user-head">
+                    <div>
+                        <h2 style="margin:0; font-size:1.8rem; color:#333;">Hi, ${state.userInfo.gender}</h2>
+                        <div style="color:#666; margin-top:5px;">${state.userInfo.ageY} 歲 | BMI ${state.userInfo.bmi}</div>
+                    </div>
+                    <div class="score-circle">
+                        <span style="font-size:1.6rem; line-height:1;">78</span><span style="font-size:0.7rem;">健康分</span>
+                    </div>
+                </div>
+                <div style="font-weight:bold; color:#666;">BMI 體位落點</div>
+                <div class="bmi-bar"><div class="bmi-pointer" style="left:${bmiPos}%"></div></div>
+                <div style="margin-top:30px; height:250px;"><canvas id="radarChart"></canvas></div>
+            </div>
+
+            <div class="prod-list">
+                <div class="prod-head">基礎保養 (您的健康底座)</div>
+                ${basics.map(renderProd).join('')}
+
+                <div class="prod-head bonus">客製化調理 (針對您的症狀標籤)</div>
+                ${addons.length > 0 ? addons.map(renderProd).join('') : '<div style="padding:20px;">您的狀況維持良好！</div>'}
+            </div>
+
+            <div style="text-align:center; padding:30px; background:white; position:sticky; bottom:0; box-shadow:0 -5px 15px rgba(0,0,0,0.05);">
+                <div style="font-size:1.4rem; font-weight:bold; color:var(--accent);">總計 NT$ ${total} / 月</div>
+                <button class="btn-main" onclick="alert('結帳')" style="margin-top:15px; width:100%;">一鍵訂閱方案</button>
+            </div>
+        `;
+        drawChart();
+    }
+
+    function analyzeAndRecommend() {
+        let basics = [];
+        let addons = [];
+        let total = 0;
+        const tags = Array.from(state.userTags);
+
+        productsDB.forEach(p => {
+            const isMatch = p.tags.some(t => tags.includes(t));
+            if(p.id.startsWith('b')) {
+                if(isMatch || p.id === 'b3' || p.id === 'b4') { // 預設推 D3 和 魚油
+                    if(!basics.find(x=>x.id===p.id)) basics.push(p);
+                }
+            } else {
+                if(isMatch) {
+                    if(!addons.find(x=>x.id===p.id)) addons.push(p);
+                }
+            }
+        });
+
+        [...basics, ...addons].forEach(p => total += p.price);
+        return { basics, addons, total };
+    }
+
+    function renderProd(p) {
+        const matchTag = p.tags.find(t => state.userTags.has(t));
+        const reason = matchTag ? `針對 ${translateTag(matchTag)}` : p.desc;
+        // 支援點擊跳轉 (若無網址則搜 Google)
+        const link = p.url || `https://www.google.com/search?q=${p.name}`;
+        const imgUrl = p.img || 'https://placehold.co/100x100/EEE/333?text=Product';
+
+        return `
+            <a href="${link}" target="_blank" style="text-decoration:none; color:inherit;">
+                <div class="prod-item">
+                    <div class="p-img" style="background-image:url('${imgUrl}')"></div>
+                    <div style="flex:1;">
+                        <div style="font-weight:bold; font-size:1.1rem; color:#333;">${p.name} <i class="fa-solid fa-arrow-up-right-from-square" style="font-size:0.8rem;color:#999;"></i></div>
+                        <div style="font-size:0.9rem; color:#666; margin-top:4px;">${p.desc}</div>
+                        <span class="tag"><i class="fa-solid fa-check"></i> ${reason}</span>
+                    </div>
+                    <div class="p-price">NT$${p.price}</div>
+                </div>
+            </a>
+        `;
+    }
+
+    function translateTag(t) {
+        const map = {'#sleep_hard':'入睡困難', '#sleep_wake':'淺眠', '#constipation':'排便不順', '#eye_use_heavy':'用眼過度', '#tired':'容易疲勞'};
+        return map[t] || '您的需求';
+    }
+
+    function drawChart() {
+        const ctx = document.getElementById('radarChart').getContext('2d');
+        new Chart(ctx, {
+            type: 'radar',
+            data: {
+                labels: ['睡眠','消化','護眼','體力','防護'],
+                datasets: [{ label: '健康指數', data: [65,55,80,70,60], backgroundColor: 'rgba(62,107,101,0.2)', borderColor:'#3E6B65' }]
+            },
+            options: { scales: { r: { min:0, max:100, ticks:{display:false} } }, plugins:{legend:{display:false}}, maintainAspectRatio:false }
+        });
+    }
+</script>
+</body>
+</html>
